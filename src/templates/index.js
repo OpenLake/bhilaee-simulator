@@ -30,6 +30,9 @@ import { opamp_arithmetics_template }
 import { opamp_characteristics_template }
     from "./opamp_characteristics.js";
 
+import { active_filters_template }
+    from "./active_filters.js";
+
 export const circuitTemplates = {
     "basic-ee-exp-1":
         power_factor_correction_template,
@@ -50,5 +53,7 @@ export const circuitTemplates = {
     "devices_and_circuits-exp4":
         opamp_arithmetics_template,
     "devices_and_circuits-exp5":
-        opamp_characteristics_template
+        opamp_characteristics_template,
+    "devices_and_circuits-exp6":
+        active_filters_template
 };
