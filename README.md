@@ -1,146 +1,363 @@
-# Circuit Simulator
+# Bhilai EE Circuit Simulator
 
-A browser-based circuit simulator for electrical engineering lab experiments. Supports DC, AC, and transient analysis with real-time visualization, oscilloscope charting, and pre-built experiment templates.
+A browser-based circuit simulator for electrical engineering lab experiments. Built with **zero dependencies** — pure HTML, CSS, and JavaScript using ES6 modules. Supports DC, AC, and transient analysis with real-time oscilloscope visualization and pre-built experiment templates.
 
-## Features
+**Live →** [bhilaee-simulator.vercel.app](https://bhilaee-simulator.vercel.app)
+**Companion App →** [Bhilai EE Labs Guide](https://bhilaee-labs.vercel.app) · [Repository](https://github.com/RavikantiAkshay/basic-lab-guide)
 
-### Components
+---
 
-| Component | Description | Shortcut |
-|-----------|-------------|----------|
-| **Voltage Source** | AC/DC supply with configurable voltage, frequency, and phase | `V` |
-| **Ground** | Reference node (0 V) | `G` |
-| **Junction** | Connection node for branching circuits | `J` |
-| **Resistor** | Fixed resistance | `R` |
-| **Capacitor** | Configurable capacitance | `C` |
-| **Inductor** | Configurable inductance | `L` |
-| **Ammeter** | Series current measurement (0 V internal source) | `A` |
-| **Voltmeter** | Parallel voltage measurement (high impedance) | `M` |
-| **Wattmeter** | 4-terminal power meter with current coil (M→L) and voltage coil (C→V) | `W` |
-| **Transformer** | Non-ideal single-phase transformer (Req, Xeq, Rc, Xm, turns ratio) | `T` |
-| **3-Phase Source** | Balanced Y-connected three-phase supply (R, Y, B, N terminals) | `3` |
-| **Load** | Series R–L load for transformer testing (0–125 % of rated load) | — |
-| **Oscilloscope** | 2-channel differential voltage/current observer with waveform display | — |
+## How It Works
 
-### Analysis Modes
+### Architecture Overview
 
-- **DC Analysis** — Steady-state operating point using MNA (Modified Nodal Analysis).
-- **AC Analysis** — Complex phasor-domain solution at a single frequency. Computes node voltages, branch currents, and instrument readings (ammeter, voltmeter, wattmeter).
-- **Transient Analysis** — Time-domain integration (Backward Euler companion models) with interactive waveform charts.
+```
+┌──────────────────────────────────────────────────────┐
+│  Browser (index.html)                                │
+│  ┌────────┐  ┌──────────────┐  ┌──────────────────┐ │
+│  │Toolbar │  │  SVG Canvas  │  │  Property Panel  │ │
+│  │ (keys) │  │ (drag/wire)  │  │  (edit values)   │ │
+│  └────────┘  └──────┬───────┘  └──────────────────┘ │
+│                     │                                │
+│  ┌──────────────────▼───────────────────────────┐    │
+│  │           CircuitGraph (data model)          │    │
+│  │     components: Map<id, Component>           │    │
+│  │     wires: Map<id, Wire>                     │    │
+│  └──────────────────┬───────────────────────────┘    │
+│                     │                                │
+│  ┌──────────────────▼───────────────────────────┐    │
+│  │         Simulation Engine                    │    │
+│  │  ┌─────────┐  ┌───────────┐  ┌───────────┐  │    │
+│  │  │MNASolver│  │Transient  │  │ Complex   │  │    │
+│  │  │(DC + AC)│  │  Solver   │  │ + Matrix  │  │    │
+│  │  └─────────┘  └───────────┘  └───────────┘  │    │
+│  └──────────────────┬───────────────────────────┘    │
+│                     │                                │
+│  ┌──────────────────▼───────────────────────────┐    │
+│  │       Visualization                          │    │
+│  │  SimpleChart · OscilloscopeChart             │    │
+│  └──────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────┘
+```
 
-### Visualization
+### Initialization Flow (`main.js`)
 
-- **Waveform Chart** — Canvas-rendered time-domain plots for transient results with auto-scaling axes, legend, and zoom/pan.
-- **Oscilloscope** — Dedicated 2-channel overlay with per-channel enable, color-coded traces (CH1 cyan, CH2 amber), crosshair cursor, and adaptive units (mV/V, mA/A, ms/µs). Supports DC flat-line, AC phasor reconstruction, and transient time-series display.
+1. **Parse URL** — Reads `expId` from `?expId=<id>` (defaults to `sandbox`).
+2. **StateManager** — Checks `localStorage` for saved state (`sim_state_<expId>`).
+3. **Template Lookup** — If no saved state, looks up `expId` in the template registry.
+4. **Preset Handling** — If the template has multiple presets (e.g., 6 op-amp configs):
+   - Checks URL for `?preset=<presetId>` → loads that specific preset.
+   - If no preset specified and multiple exist → shows the **Preset Selection Modal**.
+   - If only one preset → auto-loads it.
+5. **Deserialize** — Populates `CircuitGraph` with components and wires.
+6. **Render** — SVG canvas draws all components; toolbar and property panel initialize.
 
-### State Management
+### State Persistence
 
-- **Persistent Storage** — Circuit state is saved to `localStorage` per experiment (manual save only).
-- **Templates** — Pre-built experiments load automatically via URL parameter:
-  ```
-  http://localhost:3001/?expId=basic-ee-exp-2
-  ```
-- **New Session** — Append `&newSession=true` to force a fresh template load, discarding any saved state.
-- **Reset** — Run `localStorage.removeItem('sim_state_<expId>')` in the console and reload to revert.
+| Action | Behavior |
+|--------|----------|
+| **Page load** | Checks `localStorage` → falls back to template |
+| **Manual Save** (`Ctrl+S` / Save button) | Writes current circuit to `localStorage` |
+| **`?newSession=true`** | Clears saved state, forces fresh template load |
+| **Reset** | `localStorage.removeItem('sim_state_<expId>')` + reload |
 
-## Experiment Templates
+> Templates are **never mutated** — they act as immutable defaults. Only user-saved states go to `localStorage`.
 
-| Template ID | Experiment | Analysis |
-|-------------|------------|----------|
-| `basic-ee-exp-1` | Measurement and Correction of Power Factor | AC |
-| `basic-ee-exp-2` | Verification of Superposition Theorem | DC |
-| `basic-ee-exp-3` | Verification of Thévenin's Theorem | DC |
-| `basic-ee-exp-4` | Transient Response of Series RLC Circuit | Transient |
-| `basic-ee-exp-5` | OC & SC Test on Single-Phase Transformer | AC |
-| `basic-ee-exp-6` | Three-Phase Star and Delta Connections | AC |
-| `basic-ee-exp-7` | No-Load and Load Test on Single-Phase Transformer | AC |
+---
 
-## Getting Started
+## Components
 
-1. **Serve the project** with any static file server:
-   ```bash
-   npx -y http-server . -p 3001
-   ```
+15 electrical components, each rendered as SVG with configurable properties:
 
-2. **Open** `http://localhost:3001` in your browser.
+| Component | Type Key | Shortcut | Terminals | Key Properties |
+|-----------|----------|:--------:|-----------|----------------|
+| Voltage Source | `voltage_source` | `V` | positive, negative | voltage, type (ac/dc), frequency, phase |
+| Ground | `ground` | `G` | ref | — |
+| Junction | `junction` | `J` | node | — |
+| Resistor | `resistor` | `R` | left, right | resistance (Ω) |
+| Capacitor | `capacitor` | `C` | left, right | capacitance (F) |
+| Inductor | `inductor` | `L` | left, right | inductance (H) |
+| Ammeter | `ammeter` | `A` | positive, negative | internal 0 V source |
+| Voltmeter | `voltmeter` | `M` | positive, negative | high impedance |
+| Wattmeter | `wattmeter` | `W` | M, L, C, V | 4-terminal power meter |
+| Transformer | `transformer` | `T` | p1, p2, s1, s2 | Req, Xeq, Rc, Xm, turns ratio |
+| 3-Phase Source | `three_phase_source` | `3` | R, Y, B, N | balanced Y-connected supply |
+| Load | `load` | — | in, out | R–L series load (0–125% rated) |
+| Oscilloscope | `oscilloscope` | — | ch1±, ch2± | 2-channel differential |
+| Diode | `diode` | `D` | anode, cathode | Is, n, Vt |
+| Op-Amp | `opamp` | `O` | in_pos, in_neg, out | A_OL, GBP, Rin, Rout, CMRR, V_sat |
 
-3. **Build a circuit:**
-   - Click toolbar buttons or press keyboard shortcuts to select a component.
-   - Click the canvas to place the component.
-   - Click a terminal (dot) and then another terminal to draw a wire.
-   - Always add a **Ground** component to establish a reference node.
+### Adding a New Component
 
-4. **Run simulation:**
-   - Select the analysis type (DC, AC, or Transient) in the simulation panel.
-   - Configure parameters (frequency, simulation time, time step).
-   - Click **Run** to solve the circuit.
-   - View numeric results in the **Output** panel and waveforms in the chart/oscilloscope overlays.
+1. Create `src/components/MyComponent.js` extending `Component`.
+2. Define `type`, `shortcut`, terminals, SVG rendering, and property descriptors.
+3. Import and add to `COMPONENTS` array in `src/components/index.js`.
 
-5. **Load a template:**
-   ```
-   http://localhost:3001/?expId=basic-ee-exp-4
-   ```
+---
+
+## Analysis Modes
+
+### DC Analysis
+Steady-state operating point via **Modified Nodal Analysis (MNA)**. Solves `[G][V] = [I]` using LU decomposition. Capacitors → open, inductors → short.
+
+### AC Analysis
+Complex phasor-domain solution at a single frequency. Builds a complex admittance matrix, solves for node voltages as complex phasors. Computes RMS voltages, currents, and power readings for all instruments.
+
+### Transient Analysis
+Time-domain integration using **Backward Euler companion models**:
+- Capacitor → Norton equivalent (current source + conductance)
+- Inductor → Norton equivalent (current source + conductance)
+
+Configurable: simulation time, time step, and frequency. Results feed into the waveform chart and oscilloscope in real-time.
+
+---
+
+## Visualization
+
+### Waveform Chart (`SimpleChart.js`)
+Canvas-rendered time-domain plots with:
+- Auto-scaling Y-axis
+- Labeled X-axis (time in ms/µs)
+- Color-coded legend per trace
+- Zoom and pan support
+
+### Oscilloscope (`OscilloscopeChart.js`)
+Emulates a real 2-channel oscilloscope:
+- Per-channel enable/disable
+- Color-coded traces (CH1 = cyan, CH2 = amber)
+- Crosshair cursor with readout
+- Adaptive units: mV/V, mA/A, ms/µs
+- Supports DC flat-line, AC phasor reconstruction, and transient time-series
+
+---
+
+## Template System
+
+Templates define pre-built circuits that load automatically via URL. Each template is a JavaScript object containing components and wires.
+
+### Single-Circuit Templates
+
+For experiments with one configuration (e.g., Superposition Theorem):
+
+```js
+export const my_template = {
+    expId: "basic-ee-exp-2",
+    components: [ /* ... */ ],
+    wires: [ /* ... */ ]
+};
+```
+
+### Multi-Preset Templates
+
+For experiments with multiple configurations (e.g., Op-Amp Arithmetics with 6 circuits):
+
+```js
+export const opamp_arithmetics_template = {
+    expId: "devices_and_circuits-exp4",
+    name: "OpAmp Arithmetics",
+    presets: [
+        {
+            presetId: "summer",
+            name: "Summer",
+            description: "Op-Amp configured as a summing amplifier.",
+            circuit: { components: [...], wires: [...] }
+        },
+        {
+            presetId: "subtractor",
+            name: "Subtractor",
+            // ...
+        }
+        // ... more presets
+    ]
+};
+```
+
+When a multi-preset template loads without a `?preset=` parameter, the simulator displays a **selection modal** with cards for each preset.
+
+### Template Registry (`src/templates/index.js`)
+
+Maps `expId` strings to template objects:
+
+```js
+export const circuitTemplates = {
+    "basic-ee-exp-1": power_factor_correction_template,
+    "basic-ee-exp-2": verification_of_superposition_theorem_template,
+    // ...
+    "devices_and_circuits-exp4": opamp_arithmetics_template,
+    "devices_and_circuits-exp5": opamp_characteristics_template,
+    "devices_and_circuits-exp6": active_filters_template
+};
+```
+
+### Current Templates
+
+| Template ID | Experiment | Lab | Type | Presets |
+|-------------|------------|-----|------|:-------:|
+| `basic-ee-exp-1` | Power Factor Correction | Basic EE | AC | 1 |
+| `basic-ee-exp-2` | Superposition Theorem | Basic EE | DC | 1 |
+| `basic-ee-exp-3` | Thévenin's Theorem | Basic EE | DC | 1 |
+| `basic-ee-exp-4` | Transient Response (RLC) | Basic EE | Transient | 1 |
+| `basic-ee-exp-5` | OC & SC Test (Transformer) | Basic EE | AC | 2 |
+| `basic-ee-exp-6` | Three-Phase Connections | Basic EE | AC | 2 |
+| `basic-ee-exp-7` | No-Load & Load Test (Transformer) | Basic EE | AC | 1 |
+| `devices_and_circuits-exp3` | Diode Rectifiers | DnC | Transient | 3 |
+| `devices_and_circuits-exp4` | Op-Amp Arithmetics | DnC | DC | 6 |
+| `devices_and_circuits-exp5` | Op-Amp Characteristics | DnC | Transient | 2 |
+| `devices_and_circuits-exp6` | Active Filters | DnC | AC | 3 |
+
+---
+
+## Cross-App Integration
+
+This simulator is designed to work alongside the **[Bhilai EE Labs Guide](https://bhilaee-labs.vercel.app)** (a Next.js app that provides experiment documentation).
+
+### How Routing Works
+
+```
+Labs Guide (MyApp2)                          Simulator (MyApp1)
+┌──────────────────────┐                    ┌────────────────────────┐
+│ ExperimentLayout.js  │                    │  main.js               │
+│                      │                    │                        │
+│ simulationId from    │    HTTP redirect   │  ?expId=xxx            │
+│ exp JSON meta ──────►├───────────────────►│  ?preset=yyy           │
+│                      │                    │  ?newSession=true      │
+│ "Launch Simulator"   │                    │                        │
+│ button constructs:   │                    │  StateManager looks up │
+│ {SIMULATOR_URL}      │                    │  circuitTemplates[xxx] │
+│   ?expId=xxx         │                    │  and loads the circuit │
+│   &newSession=true   │                    │                        │
+└──────────────────────┘                    └────────────────────────┘
+```
+
+### "Back to Lab" Button
+
+The simulator reads `GUIDE_URL` from `config.js` to construct a link back to the experiment page in the Labs Guide:
+
+```js
+// config.js
+const CONFIG = {
+    GUIDE_URL: "https://bhilaee-labs.vercel.app"
+};
+```
+
+---
+
+## URL Parameters
+
+| Parameter | Example | Purpose |
+|-----------|---------|---------|
+| `expId` | `?expId=basic-ee-exp-4` | Load a specific experiment template |
+| `preset` | `&preset=summer` | Load a specific preset within a multi-preset template |
+| `newSession` | `&newSession=true` | Clear saved state and reload from template |
+
+**Full example:**
+```
+https://bhilaee-simulator.vercel.app/?expId=devices_and_circuits-exp4&preset=summer&newSession=true
+```
+
+---
+
+## Save / Load Circuits
+
+- **Save to Browser** — Persists the current circuit to `localStorage` (per `expId`).
+- **Download JSON** — Exports the circuit as a JSON file to disk.
+- **Upload JSON** — Imports a circuit from a JSON file.
+- **Change Configuration** — For multi-preset experiments, a header button re-opens the preset selection modal.
+
+---
 
 ## Project Structure
 
 ```
-├── index.html              # Application shell
-├── index.css               # Global styles (dark theme)
-├── config.js               # Runtime configuration
+├── index.html                  # App shell (toolbar, canvas, panels, modals)
+├── index.css                   # Dark theme, layout, component styles
+├── config.js                   # Runtime config (GUIDE_URL for cross-app link)
 └── src/
-    ├── main.js             # Entry point — initializes all modules
+    ├── main.js                 # Entry point — init, state loading, preset modal
     ├── core/
-    │   ├── Component.js    # Base component class, Terminal, formatValue
-    │   ├── CircuitGraph.js # Graph data structure (components + wires)
-    │   ├── Wire.js         # Wire routing and rendering
-    │   └── Node.js         # Electrical node abstraction
+    │   ├── Component.js        # Base class, Terminal, formatValue
+    │   ├── CircuitGraph.js     # Graph data model (components + wires)
+    │   ├── Wire.js             # Wire routing and SVG rendering
+    │   └── Node.js             # Electrical node abstraction
     ├── components/
-    │   ├── index.js        # Component registry & factory
-    │   ├── Resistor.js
-    │   ├── Capacitor.js
-    │   ├── Inductor.js
-    │   ├── VoltageSource.js
-    │   ├── Ground.js
-    │   ├── Junction.js
-    │   ├── Ammeter.js
-    │   ├── Voltmeter.js
-    │   ├── Wattmeter.js
-    │   ├── Transformer.js
-    │   ├── ThreePhaseSource.js
-    │   ├── Load.js
-    │   └── Oscilloscope.js
+    │   ├── index.js            # Component registry & factory
+    │   ├── Resistor.js         ├── Capacitor.js
+    │   ├── Inductor.js         ├── VoltageSource.js
+    │   ├── Ground.js           ├── Junction.js
+    │   ├── Ammeter.js          ├── Voltmeter.js
+    │   ├── Wattmeter.js        ├── Transformer.js
+    │   ├── ThreePhaseSource.js ├── Load.js
+    │   ├── Oscilloscope.js     ├── Diode.js
+    │   └── OpAmp.js
     ├── simulation/
-    │   ├── index.js        # Public exports
-    │   ├── MNASolver.js    # DC & AC solver (MNA + complex phasors)
-    │   ├── TransientSolver.js  # Time-domain solver (BE companion models)
-    │   ├── Complex.js      # Complex number & matrix arithmetic
-    │   └── Matrix.js       # Real matrix utilities (LU decomposition)
+    │   ├── index.js            # Public exports
+    │   ├── MNASolver.js        # DC & AC solver (MNA + complex phasors)
+    │   ├── TransientSolver.js  # Time-domain solver (Backward Euler)
+    │   ├── Complex.js          # Complex number & matrix arithmetic
+    │   └── Matrix.js           # Real matrix utilities (LU decomposition)
     ├── templates/
-    │   ├── index.js        # Template registry (expId → circuit state)
+    │   ├── index.js                                # Template registry
     │   ├── power_factor_correction.js
     │   ├── verification_of_superposition_theorem.js
     │   ├── verification_of_thevenin_theorem.js
     │   ├── transient_response_rlc.js
     │   ├── oc_sc_test_single_phase_transformer.js
     │   ├── three_phase_connections.js
-    │   └── transformer_test.js
+    │   ├── transformer_test.js
+    │   ├── diode_rectifiers.js
+    │   ├── opamp_arithmetics.js
+    │   ├── opamp_characteristics.js
+    │   └── active_filters.js
     ├── ui/
-    │   ├── Canvas.js       # SVG canvas — drag, drop, select, wire drawing
-    │   ├── Toolbar.js      # Component palette & keyboard shortcuts
-    │   ├── PropertyPanel.js    # Selected-component property editor
-    │   ├── SimulationControls.js   # Run/Stop/Reset, result display, chart feed
-    │   ├── SimpleChart.js      # Canvas waveform chart (transient results)
+    │   ├── Canvas.js               # SVG canvas — drag, drop, select, wire
+    │   ├── Toolbar.js              # Component palette & keyboard shortcuts
+    │   ├── PropertyPanel.js        # Selected-component property editor
+    │   ├── SimulationControls.js   # Run/Stop/Reset, results, chart feed
+    │   ├── SimpleChart.js          # Canvas waveform chart
     │   └── OscilloscopeChart.js    # 2-channel oscilloscope overlay
     └── utils/
-        └── StateManager.js # localStorage persistence & template loading
+        └── StateManager.js         # localStorage persistence & template loading
 ```
+
+---
+
+## Getting Started
+
+```bash
+# Serve with any static file server (no build step required)
+npx -y http-server . -p 3001
+
+# Or use Python
+python -m http.server 3001
+```
+
+Open `http://localhost:3001` in your browser.
+
+### Quick Start
+
+1. **Place components** — Click toolbar buttons or press keyboard shortcuts, then click the canvas.
+2. **Wire them up** — Click a terminal (dot) then click another terminal to draw a wire.
+3. **Add a Ground** — Every circuit needs at least one ground reference.
+4. **Run simulation** — Select analysis type (DC/AC/Transient), configure parameters, click **Run**.
+5. **View results** — Numeric output in the panel, waveforms in chart/oscilloscope.
+
+### Load an Experiment
+
+```
+http://localhost:3001/?expId=basic-ee-exp-4
+```
+
+---
 
 ## Technology Stack
 
-- **Pure HTML / CSS / JavaScript** — no build step, no frameworks.
-- **ES6 Modules** — native browser module loading.
-- **SVG** — component rendering and interactive canvas.
-- **Canvas API** — waveform chart and oscilloscope rendering.
+- **Pure HTML / CSS / JavaScript** — no build step, no frameworks, no bundlers
+- **ES6 Modules** — native browser module loading via `<script type="module">`
+- **SVG** — component rendering and interactive canvas
+- **Canvas API** — waveform chart and oscilloscope rendering
+- **Deployed on Vercel** as a static site
+
+---
 
 ## License
 
