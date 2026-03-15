@@ -56,7 +56,7 @@ export const circuitTemplates = {
         opamp_characteristics_template,
     "devices_and_circuits-exp6":
         active_filters_template,
-    "devices_and_circuits-exp6-basic": {
+    "sensor_lab-exp1": {
         name: "Basic Active Filters",
         presets: [low_pass_preset, high_pass_preset]
     }
