@@ -30,7 +30,7 @@ import { opamp_arithmetics_template }
 import { opamp_characteristics_template }
     from "./opamp_characteristics.js";
 
-import { active_filters_template }
+import { active_filters_template, low_pass_preset, high_pass_preset }
     from "./active_filters.js";
 
 export const circuitTemplates = {
@@ -55,5 +55,9 @@ export const circuitTemplates = {
     "devices_and_circuits-exp5":
         opamp_characteristics_template,
     "devices_and_circuits-exp6":
-        active_filters_template
+        active_filters_template,
+    "devices_and_circuits-exp6-basic": {
+        name: "Basic Active Filters",
+        presets: [low_pass_preset, high_pass_preset]
+    }
 };
