@@ -39,6 +39,8 @@ import { instrumentation_amplifier_template, instrumentation_amplifier_preset }
 import { lvdt_template } from "./lvdt.js";
 import { strain_gauge_template } from "./strain_gauge.js";
 import { load_cell_template } from "./load_cell.js";
+import { rtd_template } from "./rtd.js";
+import { thermistor_template } from "./thermistor.js";
 
 export const circuitTemplates = {
     "basic-ee-exp-1":
@@ -78,5 +80,9 @@ export const circuitTemplates = {
     "sensor_lab-strain_gauge":
         strain_gauge_template,
     "sensor_lab-load_cell":
-        load_cell_template
+        load_cell_template,
+    "sensor_lab-rtd":
+        rtd_template,
+    "sensor_lab-thermistor":
+        thermistor_template
 };

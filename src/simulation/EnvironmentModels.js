@@ -23,9 +23,9 @@ export class ThermalEnvironment {
      */
     constructor(opts = {}) {
         this.ambientTemp = opts.ambientTemp ?? 25;
-        this.timeConstant = opts.timeConstant ?? 15;        // Slower default thermal rise
+        this.timeConstant = opts.timeConstant ?? 50;        // Slower default thermal rise (~1.5°C/s at 5V)
         this.maxTemp = opts.maxTemp ?? 300;
-        this.heaterGain = opts.heaterGain ?? 35;          // Lower default °C per volt
+        this.heaterGain = opts.heaterGain ?? 15;          // 15°C per volt
         this.noiseAmplitude = opts.noiseAmplitude ?? 0.2;
 
         // State

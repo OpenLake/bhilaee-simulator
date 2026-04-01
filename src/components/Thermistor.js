@@ -182,7 +182,7 @@ export class Thermistor extends Component {
             <rect x="-12" y="30" width="24" height="4" rx="1" fill="#cbd5e1" opacity="0.5"/>
             <rect x="-12" y="30" width="${tempBar}" height="4" rx="1" fill="#ef4444"/>
 
-            <text x="-40" y="-22" font-size="6" fill="#ef4444" font-weight="bold">HEAT</text>
+            <text x="-50" y="-24" font-size="4" fill="#ef4444" font-weight="bold">Heater (~1.5°C/s @ 5V)</text>
             <text x="25" y="-22" text-anchor="middle" font-size="6" fill="#22c55e" font-weight="bold">Thermistor NTC</text>
             <text x="0" y="38" text-anchor="middle" font-size="7" fill="#64748b">${this.sensorState.temperature.toFixed(1)}°C</text>
             
