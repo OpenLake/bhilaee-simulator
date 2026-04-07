@@ -714,21 +714,30 @@ export class Canvas {
      */
     async exportAsImage(format = 'png') {
         try {
-            // 1. Calculate bounding box of active circuit content
-            // We force a layout recalc to ensure getBBox is accurate
+            // 1. Calculate bounding box of active circuit content (handling empty layers)
             const componentsBBox = this.componentsLayer.getBBox();
             const wiresBBox = this.wiresLayer.getBBox();
+            
+            const hasComponents = this.circuit.getComponentCount() > 0;
+            const hasWires = this.circuit.wires.size > 0;
 
-            if (this.circuit.getComponentCount() === 0 && this.circuit.wires.size === 0) {
+            if (!hasComponents && !hasWires) {
                 alert("Nothing to export! The canvas is empty.");
                 return;
             }
 
-            // Union of bounding boxes
-            const x = Math.min(componentsBBox.x, wiresBBox.x);
-            const y = Math.min(componentsBBox.y, wiresBBox.y);
-            const w = Math.max(componentsBBox.x + componentsBBox.width, wiresBBox.x + wiresBBox.width) - x;
-            const h = Math.max(componentsBBox.y + componentsBBox.height, wiresBBox.y + wiresBBox.height) - y;
+            // Union of bounding boxes (only consider non-empty layers)
+            let x, y, w, h;
+            if (hasComponents && hasWires) {
+                x = Math.min(componentsBBox.x, wiresBBox.x);
+                y = Math.min(componentsBBox.y, wiresBBox.y);
+                w = Math.max(componentsBBox.x + componentsBBox.width, wiresBBox.x + wiresBBox.width) - x;
+                h = Math.max(componentsBBox.y + componentsBBox.height, wiresBBox.y + wiresBBox.height) - y;
+            } else if (hasComponents) {
+                ({ x, y, width: w, height: h } = componentsBBox);
+            } else {
+                ({ x, y, width: w, height: h } = wiresBBox);
+            }
 
             // Professional padding
             const padding = 80;
